@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./scripts/setup_envs.sh:*)",
+      "Bash(source:*)",
+      "Bash(conda activate:*)",
+      "Bash(pip install:*)",
+      "Bash(brew install:*)",
+      "Bash(export JAVA_HOME=/opt/homebrew/opt/openjdk@11:*)",
+      "Bash(export PATH=\"$JAVA_HOME/bin:$PATH\")",
+      "Bash(./setup.sh:*)",
+      "Bash(python:*)",
+      "Bash(export PYTHONPATH=\"/Users/williamsuratt/Desktop/state-gated-rag/external/WebShop:$PYTHONPATH\":*)",
+      "Bash(export JAVA_HOME=/opt/homebrew/opt/openjdk@17:*)",
+      "Bash(export JAVA_HOME=/opt/homebrew/opt/openjdk@21)",
+      "Bash(bash -c:*)",
+      "Bash(export JAVA_TOOL_OPTIONS=\"--add-modules jdk.incubator.vector\")",
+      "Bash(pip show:*)",
+      "Bash(export JAVA_HOME:*)",
+      "Bash(export JVM_PATH=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home/lib/server/libjvm.dylib:*)",
+      "Bash(export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home)",
+      "Bash(export JVM_PATH=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home/lib/server/libjvm.dylib:*)",
+      "Bash(ls:*)",
+      "Bash(python3:*)",
+      "Bash(pip3 install:*)",
+      "Bash(/Users/williamsuratt/anaconda3/envs/ssm-agent/bin/python:*)",
+      "Bash(/Users/williamsuratt/anaconda3/envs/ssm-agent/bin/pip list:*)"
+    ]
+  }
+}
