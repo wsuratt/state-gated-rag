@@ -1,6 +1,6 @@
 # State-Gated Context: Learning to Compress Based on Agent State
 
-A novel approach to context management for LLM agents that conditions **compression** (not retrieval) on the agent's **evolving internal state**.
+An approach to context management for LLM agents that conditions **compression** (not retrieval) on the agent's **evolving internal state**.
 
 > **Key finding:** Retrieval discards structure; compression preserves it. State-gated retrieval fails (8% success), but state-gated compression recovers to baseline (43% success).
 
