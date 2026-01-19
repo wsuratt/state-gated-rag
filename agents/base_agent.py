@@ -13,6 +13,7 @@ class AgentConfig:
     model: str = "gpt-4o-mini"
     top_k: int = 5  # For retrieval agents
     verbose: bool = False
+    context_budget: int = 0  # Max context chars (0 = unlimited)
 
 
 class BaseAgent(ABC):
@@ -22,6 +23,9 @@ class BaseAgent(ABC):
         self.config = config
         self.history: List[Dict[str, Any]] = []
         self.step_count = 0
+        self.total_context_chars = 0  # Track total context sent to LLM
+        self.total_prompt_tokens = 0  # Track actual prompt tokens from API
+        self.total_completion_tokens = 0  # Track completion tokens from API
 
     @abstractmethod
     def reset(self) -> None:

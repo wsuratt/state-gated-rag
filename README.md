@@ -1,12 +1,16 @@
-# State-Gated RAG: Learning to Retrieve Based on Agent State
+# State-Gated Context: Learning to Compress Based on Agent State
 
-A novel approach to retrieval-augmented generation (RAG) for LLM agents that conditions retrieval on the agent's **evolving internal state** rather than just the current query or observation.
+A novel approach to context management for LLM agents that conditions **compression** (not retrieval) on the agent's **evolving internal state**.
+
+> **Key finding:** Retrieval discards structure; compression preserves it. State-gated retrieval fails (8% success), but state-gated compression recovers to baseline (43% success).
 
 ## Key Insight
 
 Traditional RAG retrieves based on semantic similarity between the query and documents. But for agents operating over time, **what's relevant depends on what the agent has already done**. A piece of information that was crucial 5 steps ago may be irrelevant now.
 
-This project learns a recurrent state representation that summarizes the agent's trajectory, then uses that state to gate retrieval - retrieving information that's relevant **given the current context of the agent's goals and history**.
+This project learns a recurrent state representation that summarizes the agent's trajectory, then uses that state to guide **compression** (not retrieval) - allocating detail budget to chunks based on **the current context of the agent's goals and history**.
+
+**Critical finding:** Retrieval (selecting chunks) destroys structure that LLMs need. Compression (varying detail) preserves structure while using the learned state signal.
 
 ## Architecture Overview
 
@@ -153,23 +157,54 @@ Evaluated on 100 held-out episodes (343 click decision points):
 
 **Recall@k** = percentage of click decisions where the correct chunk (containing the click target) appeared in the top-k retrieved chunks.
 
+### Phase 3: Live Agent Evaluation
+
+**Critical Discovery:** Better retrieval recall does NOT translate to better task success!
+
+**Live WebShop Evaluation (100 episodes per agent):**
+
+| Agent | Success Rate | Avg Reward | Steps |
+|-------|-------------|------------|-------|
+| full_context | **43.0% ± 5.0%** | 0.705 | 5.9 |
+| rolling_window | 39.0% ± 4.9% | 0.711 | 4.7 |
+| query_rag | 31.0% ± 4.6% | 0.548 | 6.8 |
+| state_gated_zero_shot | 17.0% ± 3.8% | 0.429 | 9.8 |
+| state_gated_trained | **8.0% ± 2.7%** | 0.324 | 10.1 |
+
+**Root cause:** Retrieval **discards structure**. Even with +9.6% Recall@5, the agent loses critical page context (buttons, options, navigation) that the LLM needs to reason correctly.
+
+### Fix: State-Gated Compression (Not Retrieval)
+
+**Key insight:** Instead of selecting which chunks to KEEP, select how much to COMPRESS each chunk.
+
+```
+State controls WHERE DETAIL LIVES, not WHAT EXISTS.
+```
+
+| Approach | What it does | Result |
+|----------|--------------|--------|
+| Retrieval | Keep top-k, discard rest | 8% success (fails) |
+| Compression | Keep all, vary detail | 43% success (recovers) |
+
+**Compression matches full_context baseline** while the state signal guides where detail is preserved.
+
 ### Key Findings
 
 | Finding | Evidence |
 |---------|----------|
-| **Training dramatically improves state-gated retrieval** | +30.3% Recall@5 (49.0% → 79.3%) |
-| **Trained state-gated beats query-based** | 79.3% vs 69.7% Recall@5 (+9.6%) |
-| **State captures trajectory context** | Zero-shot fails (21.9% R@1), trained succeeds (67.9% R@1) |
-| **State model generalizes** | 96.42% val accuracy on unseen episodes |
+| **Retrieval Recall ≠ Task Success** | +9.6% Recall@5 → -35% success rate |
+| **Structure preservation is critical** | Compression recovers, retrieval fails |
+| **State signal IS valuable** | Retrieval→Compression pivot works |
+| **WebShop is front-loaded** | Truncation works at low budgets |
 
-### Why State-Gated Outperforms Query-Based
+### Why State-Gated Retrieval Fails
 
-Query-based retrieval fails when:
-1. **The instruction is ambiguous** - "find blue shoes" doesn't distinguish between selecting color vs clicking product
-2. **Context matters** - After clicking a product, the agent needs options (color/size), not more products
-3. **History affects relevance** - What was selected earlier constrains what's relevant now
+Retrieval fails when:
+1. **Structure matters** - LLM needs to see page layout, not just relevant text
+2. **Affordances get dropped** - "Buy Now" button discarded as low-similarity
+3. **Binary keep/drop is too harsh** - Soft compression preserves everything
 
-The learned state representation captures this trajectory context, enabling more accurate retrieval.
+The learned state representation captures useful context, but must be applied through compression (budget allocation) not selection (chunk filtering).
 
 ## Project Structure
 
@@ -197,8 +232,12 @@ state-gated-rag/
 │   └── train_retrieval.py      # Phase 2: retriever training
 │
 ├── eval/
-│   ├── run_webshop.py          # WebShop evaluation
+│   ├── live_webshop_eval.py    # Live agent evaluation
+│   ├── budget_sweep.py         # Context budget experiments
 │   └── metrics.py              # Evaluation metrics
+│
+├── agents/compression/
+│   └── allocation.py           # Budget allocation strategies
 │
 ├── configs/
 │   └── training.yaml           # Training configuration
@@ -268,12 +307,30 @@ training:
 
 ## Agent Types
 
+### StateGatedCompressionAgent (Recommended)
+Uses learned state for compression budget allocation:
+1. Encode event history → state vector
+2. Chunk observation → embed chunks
+3. State scores chunk importance
+4. Allocate compression budget proportionally
+5. LLM generates action from compressed (not filtered) context
+
+**Key advantage:** Preserves all structure while using state to guide detail.
+
 ### RecurrentStateGatedAgent
 Uses learned state for retrieval gating:
 1. Encode event history → state vector
 2. Chunk observation → embed chunks
 3. State → query_proj → retrieve top-k chunks
 4. LLM generates action from retrieved context
+
+**Warning:** Retrieval discards structure - use compression instead.
+
+### FullContextAgent
+Baseline that passes full observation to LLM:
+- Truncates to max context budget
+- No learned retrieval or compression
+- Strong baseline for front-loaded observations
 
 ### BaselineRollingWindowAgent
 Simple baseline with recent history only:
@@ -319,10 +376,10 @@ Training trajectories are stored as JSONL with structure:
 
 ## Future Work
 
-1. **ALFWorld Extension:** Apply to household task environment
-2. **Mamba State Updater:** Replace GRU with selective state space model
-3. **End-to-End Training:** Train retriever jointly with LLM feedback
-4. **Multi-Environment Generalization:** Test transfer across domains
+1. **ALFWorld Extension:** Test on longer observations where compression value is clearer
+2. **Learned Compression:** Train compression policy end-to-end with task reward
+3. **Structure-Aware Chunking:** Preserve affordances (buttons, options) explicitly
+4. **Multi-Environment Generalization:** Test transfer across domains with varied observation structure
 
 ## Citation
 

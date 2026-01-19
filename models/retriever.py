@@ -82,6 +82,41 @@ class StateConditionedRetriever(nn.Module):
             return topk_indices, topk_scores
         return topk_indices, None
 
+    def score_chunks(
+        self,
+        state: torch.Tensor,
+        chunk_embeddings: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Score all chunks based on state (for compression budget allocation).
+
+        Args:
+            state: (d_state,) or (batch, d_state)
+            chunk_embeddings: (num_chunks, d_chunk)
+
+        Returns:
+            scores: (num_chunks,) - importance scores for each chunk
+        """
+        single_query = state.dim() == 1
+        if single_query:
+            state = state.unsqueeze(0)
+
+        # Project state to query
+        query = self.query_proj(state)  # (batch, d_chunk)
+
+        # Normalize for cosine similarity
+        query = F.normalize(query, dim=-1)
+        chunk_embeddings = F.normalize(chunk_embeddings, dim=-1)
+
+        # Compute similarities
+        scores = torch.matmul(query, chunk_embeddings.T)  # (batch, num_chunks)
+        scores = scores / self.temperature
+
+        if single_query:
+            scores = scores.squeeze(0)
+
+        return scores
+
     def compute_retrieval_loss(
         self,
         state: torch.Tensor,
